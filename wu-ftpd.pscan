@@ -1,0 +1,41 @@
+######################################################################
+# Copyright (C) 2000 Alan DeKok <aland@ox.org>
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or (at
+# your option) any later version.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307,
+# USA
+######################################################################
+#
+#  This is an additional definition file for wu-ftpd, as of v2.6.1
+#  Use with:
+#
+#	pscan -p wu-ftpd.pscan *.c
+#
+#
+#  The format of this file is:
+#
+# function_name  format_offset
+#
+# e.g. wu-ftpd has the following prototypes:
+#
+# ./wu-ftpd-2.6.1/src/proto.h:179:void reply(int, char *fmt,...);
+# ./wu-ftpd-2.6.1/src/proto.h:180:void lreply(int, char *fmt,...);
+# ./wu-ftpd-2.6.1/src/proto.h:198:void setproctitle(const char *fmt,...);
+#
+#  So the function 'reply' has argument 0 (zero) of 'int', and
+#  argument 1 of the format.  That's where the '1', below, comes from.
+#
+reply 		1
+lreply		1
+setproctitle	0

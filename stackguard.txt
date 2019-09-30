@@ -1,0 +1,161 @@
+to: BUGTRAQ@SECURITYFOCUS.COM
+Subject: StackGuard with ... Re: [Paper] Format bugs. 
+In-reply-to: Your message of "Tue, 18 Jul 2000 17:10:50 +0200."
+             <20000718171050.A11026@kalou.in.grolier.fr> 
+Date: Fri, 21 Jul 2000 12:21:20 -0400
+From: Alan DeKok <aland@cpu1751.adsl.bellglobal.com>
+
+Pascal Bouchareine <pb@GROLIER.FR> wrote:
+>   This paper tries to explain how to exploit a printf(userinput) format
+> bug, reported in some recent advisories. The approach is primary, and
+> more precisely does not take into account any existing exploit (wu-ftpd, ...).
+> [ ... ]
+>
+> When sprintf encounters a conversion string, it simply takes the first pushed
+> word (32 bits, 4 bytes on intel) on the stack and in the case of "%x"
+> converter, prints it to screen as hexadecimal.
+
+  That is, you easily examine the stack remotely.  This allows you to
+gain additional information about the system, such as the status of
+it's protection against stack smashing attacks, e.g.
+
+  http://immunix.org/stackguard.html
+
+
+  My reading of their pages and papers leads to me to conclude that
+they have an implicit assumption (I don't notice it explicitely
+stated) that the attacker does NOT have read access to the stack.  The
+Stack Guard papers seem to assume that "blind" buffer overflows are
+the primary means of attack.
+
+[ Crispin Cowan (author of StackGuard) responds: ]
+
+   At the time StackGuard was built, and at present, blind overflows
+   are the primary means of attack.  This % printf hack has the potential
+   to change that. [1]
+
+
+
+  As the "Format bugs" paper pointed out, it is possible to READ the
+stack, as well as to write (nearly) arbitrary data to the stack of the
+target machine.  The obvious conclusion is that SOME methods of stack
+"canaries" may be externally discovered, and externally bypassed.  I
+will not go into details here, as they should be readily apparent from
+Pascal's paper.
+
+  The methods that Stack Guard uses to protect the stack are:
+
+   - Random canaries
+   - NULL canary (0x00000000)
+   - Terminator canary  (combination of NULL, CR, LF, -1)
+
+  These canaries are all constant.  They MAY be discovered by an
+external attacker, and it MAY be possible to re-write the canaries
+with an introspective stack overflow.  This will bypass the canary
+protection.
+
+  There is no obvious method of using constant canaries to protect the
+stack against an introspective attacker.  They do, however, protect
+very well against blind buffer overflows.
+
+
+  Stack Guard has another method to protect against attacks which
+do not overflow the stack, but in which:
+
+    ... the attacker can cause the p pointer to point anywhere in
+    memory, but especially at a return address record in an
+    activation record.  When the program then takes input and stores
+    it where p points, the input data is stored where the attacker
+    said to store it. [2]
+
+
+  The XOR Random Canary protects against this attack by having it
+
+    XOR the canary with the return address word, so that the return
+    address is bound to the random canary value. [2]
+
+
+  If the attacker can examine the stack, this protection may be
+bypassed as well.  The return address is usually well known, or at
+least strongly bounded.  It is then possible to use the known return
+address to discover the value of the random canary, and to XOR it with
+a return address chosen by the attacker.  Any security offered by the
+XOR Random Canary is then bypassed.
+
+
+  Stack Guard does use more than one XOR Random Canary, which
+increases the difficulty of the discovering or predicting which of the
+128 random canaries will next be used.
+
+  Note, however, that the stack can be observed, and the canaries
+discovered, WITHOUT the attacker writing to the stack.  As the stack
+is not written to, the Stack Guard protection mechanism will never
+fire, and the administrator will never notice that an attacker is
+nearing the ability to bypass the Stack Guard protection.
+
+
+  A more secure method of using XOR canaries would be to continuously
+generate new canaries from a cryptographically strong pseudo-random
+number generator.  By choosing a good CS-PRNG, the Stack Guard
+protection can make it arbitrarily difficult for the attacker to
+discover the next random canary.  The attacker thus can never gain
+undetected control of the stack.
+
+[ Crispin Cowan responds: ]
+
+   The values are "constant" (statically bound to functions) because
+   you need to be able to remember the canaries you left on the stack, in
+   stack order.  Normally, one would use a stack to remember such things,
+   but we're trying to protect the stack, so that won't work so well :-)
+   Regardless of your random number generation technique, it must be
+   possible for the function cleanup code to decide whether the canary is
+   good when the function returns. [1]
+
+
+  Even if a CS-PRNG was used, Pascal Bouchareine's paper comes in
+handy.  The state of the PRNG may be discovered by the attacker, by
+having him:
+
+> issue the following "pseudo string" to print out the buffer:
+> 
+> [4 bytes address of find_me]%s
+> 
+> Yes! It is *that* simple: in this case, the input buffer is both the format
+> string AND the format string argument.. :)
+> 
+> Let's do it simply :
+> 
+> [pb@camel][formats]> printf "\x02\x96\x04\x08%s\n" | ./v
+
+
+  The attacker can thus examine arbitrary memory on the machine, which
+allows him to eventually discover the PRNG, and it's state.  The
+challenge, then, is to put the state of the PRNG in a location which
+is not easily discoverable by an attacker.  It is also not obvious how
+to protect a program against an attacker who can see it's entire
+internal state.
+
+
+  We should note that this sort of attack is NOT the classic and
+well-known buffer overflow attack.  As Crispin says above, this attack
+appears to be new.
+
+
+  In summary, an attacker who is introspective of the stack can bypass
+all predictable methods of protecting the stack with canaries.
+Programmers should carefully audit their code for the sort of % printf
+style vulnerabilities.  An automated scanner PScan which *may* help
+(but which isn't perfect) is available.[3]
+
+  There is no substitute, however, for a careful line-by-line audit of
+code.
+
+
+  Alan DeKok.
+
+References
+- ----------
+[1] Crispin Cowan <crispin@wirex.com>, private communication
+[2] http://immunix.org/StackGuard/emsi_vuln.html
+[3] http://www.striker.ottawa.on.ca/~aland/pscan/
+[4] http://immunix.org/stackguard.html
